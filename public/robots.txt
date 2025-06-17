@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://lab14-myc8.onrender.com/api/sitemap
