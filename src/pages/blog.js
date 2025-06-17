@@ -1,7 +1,6 @@
 import Head from "next/head";
 
 export default function Blog() {
-  // Simulamos datos de blog que podrían venir de una API o CMS
   const blogPosts = [
     {
       id: 1,

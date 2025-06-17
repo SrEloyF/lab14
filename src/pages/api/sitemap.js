@@ -1,41 +1,66 @@
 const BASE_URL = "https://lab14-myc8.onrender.com";
 
 const getBlogPosts = async () => {
-  return [
-    {
-      slug: "optimizacion-seo-nextjs",
-      lastModified: "2024-06-15",
+  try {
+    const response = await fetch(`${BASE_URL}/api/blog/posts?limit=100`);
+    const data = await response.json();
+    
+    return data.posts.map(post => ({
+      slug: post.slug,
+      lastModified: post.updatedAt.split('T')[0],
       changeFreq: "monthly",
-      priority: 0.8
-    },
-    {
-      slug: "componentes-dinamicos-react", 
-      lastModified: "2024-06-10",
-      changeFreq: "monthly",
-      priority: 0.8
-    },
-    {
-      slug: "sitemap-dinamico-api-routes",
-      lastModified: "2024-06-05", 
-      changeFreq: "monthly",
-      priority: 0.8
-    }
-  ];
+      priority: post.featured ? 0.9 : 0.8
+    }));
+  } catch (error) {
+    console.error('Error fetching blog posts:', error);
+    return [
+      {
+        slug: "optimizacion-seo-nextjs",
+        lastModified: "2024-06-15",
+        changeFreq: "monthly",
+        priority: 0.8
+      }
+    ];
+  }
 };
 
-const getProducts = async () => {
+const getServices = async () => {
+  try {
+    const response = await fetch(`${BASE_URL}/api/services`);
+    const data = await response.json();
+    
+    return data.services.map(service => ({
+      slug: service.slug,
+      lastModified: service.updatedAt.split('T')[0],
+      changeFreq: "weekly",
+      priority: service.featured ? 0.9 : 0.8
+    }));
+  } catch (error) {
+    console.error('Error fetching services:', error);
+    return [
+      {
+        slug: "desarrollo-web",
+        lastModified: "2024-06-01",
+        changeFreq: "weekly",
+        priority: 0.9
+      }
+    ];
+  }
+};
+
+const getAdditionalPages = async () => {
   return [
     {
-      slug: "desarrollo-web",
-      lastModified: "2024-06-01",
-      changeFreq: "weekly",
-      priority: 0.9
+      slug: "sobre-nosotros",
+      lastModified: "2024-05-15",
+      changeFreq: "monthly",
+      priority: 0.6
     },
     {
-      slug: "consultoria-seo",
-      lastModified: "2024-05-28",
-      changeFreq: "weekly", 
-      priority: 0.9
+      slug: "portfolio",
+      lastModified: "2024-06-10",
+      changeFreq: "weekly",
+      priority: 0.7
     }
   ];
 };
@@ -63,8 +88,11 @@ export default async function handler(req, res) {
       }
     ];
 
-    const blogPosts = await getBlogPosts();
-    const products = await getProducts();
+    const [blogPosts, services, additionalPages] = await Promise.all([
+      getBlogPosts(),
+      getServices(),
+      getAdditionalPages()
+    ]);
 
     const blogUrls = blogPosts.map(post => ({
       url: `/blog/${post.slug}`,
@@ -73,17 +101,29 @@ export default async function handler(req, res) {
       priority: post.priority
     }));
 
-    const productUrls = products.map(product => ({
-      url: `/servicios/${product.slug}`,
-      lastModified: product.lastModified,
-      changeFreq: product.changeFreq,
-      priority: product.priority
+    const serviceUrls = services.map(service => ({
+      url: `/servicios/${service.slug}`,
+      lastModified: service.lastModified,
+      changeFreq: service.changeFreq,
+      priority: service.priority
     }));
 
-    const allUrls = [...staticPages, ...blogUrls, ...productUrls];
+    const additionalUrls = additionalPages.map(page => ({
+      url: `/${page.slug}`,
+      lastModified: page.lastModified,
+      changeFreq: page.changeFreq,
+      priority: page.priority
+    }));
+
+    const allUrls = [...staticPages, ...blogUrls, ...serviceUrls, ...additionalUrls];
 
     const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:news="http://www.google.com/schemas/sitemap-news/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml"
+        xmlns:mobile="http://www.google.com/schemas/sitemap-mobile/1.0"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
+        xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
   ${allUrls
     .map((page) => `
     <url>
@@ -96,14 +136,21 @@ export default async function handler(req, res) {
     .join("")}
 </urlset>`;
 
-    res.setHeader("Content-Type", "text/xml");
-    res.setHeader("Cache-Control", "public, s-maxage=86400, stale-while-revalidate");
+    res.setHeader("Content-Type", "text/xml; charset=utf-8");
+    res.setHeader("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=604800");
+    res.setHeader("X-Robots-Tag", "noindex");
+    
+    res.setHeader("X-Sitemap-Generated", new Date().toISOString());
     
     res.write(sitemap);
     res.end();
 
   } catch (error) {
     console.error("Error generando sitemap:", error);
-    res.status(500).json({ error: "Error generando sitemap" });
+    res.status(500).json({ 
+      error: "Error generando sitemap",
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
   }
 }
